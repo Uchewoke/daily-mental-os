@@ -18,13 +18,13 @@ export default async function LandingPage() {
         <span className="text-xl font-bold tracking-tight">Daily Mental OS</span>
         <div className="flex items-center gap-4">
           <Link
-            href="/dashboard"
+            href="/login"
             className="text-slate-400 hover:text-white text-sm transition"
           >
             Sign in
           </Link>
           <Link
-            href="/dashboard"
+            href="/signup"
             className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
           >
             Start free
@@ -50,7 +50,7 @@ export default async function LandingPage() {
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link
-            href="/dashboard"
+            href="/signup"
             className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-4 rounded-xl text-lg transition"
           >
             Start your first check-in
@@ -174,7 +174,7 @@ export default async function LandingPage() {
               ))}
             </ul>
             <Link
-              href="/dashboard"
+              href="/signup"
               className="block text-center border border-slate-600 hover:border-slate-400 text-white font-medium px-6 py-3 rounded-xl transition"
             >
               Get started free
@@ -189,7 +189,7 @@ export default async function LandingPage() {
             <h3 className="text-white font-bold text-xl mb-1">Plus</h3>
             <p className="text-slate-400 text-sm mb-6">For daily coaching</p>
             <p className="text-4xl font-bold text-white mb-8">
-              $4.99<span className="text-lg font-normal text-slate-400">/mo</span>
+              $9.99<span className="text-lg font-normal text-slate-400">/mo</span>
             </p>
             <ul className="flex flex-col gap-3 mb-8">
               {[
@@ -206,7 +206,7 @@ export default async function LandingPage() {
               ))}
             </ul>
             <Link
-              href="/dashboard"
+              href="/signup"
               className="block text-center bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition"
             >
               Upgrade to Plus
@@ -221,7 +221,7 @@ export default async function LandingPage() {
             <h3 className="text-white font-bold text-xl mb-1">Pro</h3>
             <p className="text-slate-400 text-sm mb-6">For high performers</p>
             <p className="text-4xl font-bold text-white mb-8">
-              $9.99<span className="text-lg font-normal text-slate-400">/mo</span>
+              $14.99<span className="text-lg font-normal text-slate-400">/mo</span>
             </p>
             <ul className="flex flex-col gap-3 mb-8">
               {[
@@ -239,7 +239,7 @@ export default async function LandingPage() {
               ))}
             </ul>
             <Link
-              href="/dashboard"
+              href="/signup"
               className="block text-center bg-purple-600 hover:bg-purple-700 text-white font-semibold px-6 py-3 rounded-xl transition"
             >
               Upgrade to Pro
@@ -255,7 +255,7 @@ export default async function LandingPage() {
           No credit card. No fluff. Just your first AI-powered check-in.
         </p>
         <Link
-          href="/dashboard"
+          href="/signup"
           className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-10 py-4 rounded-xl text-lg transition"
         >
           Try it free

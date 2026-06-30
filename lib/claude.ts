@@ -20,11 +20,7 @@ interface MoodAnalysis {
   patternDetected: string;
 }
 
-/**
- * Analyzes a mood check-in and returns personalized coaching
- * Uses Claude Sonnet 4.6 for fast, cost-effective responses
- */
-export async function analyzeMood(checkIn: MoodCheckIn): Promise<MoodAnalysis> {
+function buildMoodPrompts(checkIn: MoodCheckIn) {
   const systemPrompt = `You are an empathetic AI wellness coach specializing in helping creators and professionals manage stress and mental health. You provide specific, actionable coaching without being generic or clichéd.
 
 Key traits:
@@ -51,6 +47,58 @@ Respond ONLY with valid JSON (no markdown, no extra text):
   "patternDetected": "Pattern name if applicable (perfectionism_spiral, burnout_risk, rumination_loop, imposter_syndrome, decision_paralysis, none). Use snake_case."
 }`;
 
+  return { systemPrompt, userPrompt };
+}
+
+function isOverloadedError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return msg.includes("overloaded_error") || msg.includes("Overloaded");
+}
+
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function streamMoodAnalysis(checkIn: MoodCheckIn): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  const { systemPrompt, userPrompt } = buildMoodPrompts(checkIn);
+
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const maxRetries = 3;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          const stream = client.messages.stream({
+            model: "claude-sonnet-4-6",
+            max_tokens: 500,
+            system: systemPrompt,
+            messages: [{ role: "user", content: userPrompt }],
+          });
+
+          stream.on("text", (delta) => {
+            controller.enqueue(encoder.encode(delta));
+          });
+
+          await stream.finalMessage();
+          controller.close();
+          return;
+        } catch (error) {
+          if (isOverloadedError(error) && attempt < maxRetries - 1) {
+            await sleep(1500 * (attempt + 1));
+            continue;
+          }
+          controller.error(error);
+          return;
+        }
+      }
+    },
+  });
+}
+
+export async function analyzeMood(checkIn: MoodCheckIn): Promise<MoodAnalysis> {
+  const { systemPrompt, userPrompt } = buildMoodPrompts(checkIn);
+
+  let responseText = "";
   try {
     const message = await client.messages.create({
       model: "claude-sonnet-4-6",
@@ -64,11 +112,21 @@ Respond ONLY with valid JSON (no markdown, no extra text):
       ],
     });
 
-    const responseText =
+    responseText =
       message.content[0].type === "text" ? message.content[0].text : "";
+  } catch (error) {
+    console.error("Claude API error:", error);
+    throw new Error("Failed to generate coaching insight");
+  }
 
-    // Parse JSON response
-    const parsed = JSON.parse(responseText);
+  try {
+    // Strip markdown code fences if present
+    const cleaned = responseText
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/, "")
+      .trim();
+
+    const parsed = JSON.parse(cleaned);
 
     return {
       insight: parsed.insight || "",
@@ -76,8 +134,8 @@ Respond ONLY with valid JSON (no markdown, no extra text):
       patternDetected: parsed.patternDetected || "none",
     };
   } catch (error) {
-    console.error("Claude API error:", error);
-    throw new Error("Failed to generate coaching insight");
+    console.error("JSON parse error. Raw response:", responseText);
+    throw new Error("Failed to parse coaching insight response");
   }
 }
 
