@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { getCheckInCountThisWeek } from "@/lib/check-ins";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -19,7 +20,7 @@ export async function GET() {
   }
 
   const plan = (data.user.user_metadata?.plan as string) || "free";
+  const checkinsThisWeek = await getCheckInCountThisWeek(userId);
 
-  // TODO: replace with a real check-in count from a check_ins table once persistence is added
-  return NextResponse.json({ plan, checkinsThisWeek: 0 });
+  return NextResponse.json({ plan, checkinsThisWeek });
 }

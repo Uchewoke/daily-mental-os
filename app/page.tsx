@@ -268,9 +268,9 @@ export default async function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-slate-500 text-sm">
           <span>© 2026 Daily Mental OS</span>
           <div className="flex gap-6">
-            <a href="#" className="hover:text-slate-300 transition">Privacy</a>
-            <a href="#" className="hover:text-slate-300 transition">Terms</a>
-            <a href="mailto:cheuche87@gmail.com" className="hover:text-slate-300 transition">Contact</a>
+            <Link href="/privacy" className="hover:text-slate-300 transition">Privacy</Link>
+            <Link href="/terms" className="hover:text-slate-300 transition">Terms</Link>
+            <Link href="/contact" className="hover:text-slate-300 transition">Contact</Link>
           </div>
         </div>
       </footer>

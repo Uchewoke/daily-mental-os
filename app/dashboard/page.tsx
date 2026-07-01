@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, CheckCircle2, Zap } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Zap, ShieldAlert, TrendingUp, Sparkles, Mail } from 'lucide-react';
 
 const PLUS_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PLUS_PRICE_ID!;
 
@@ -15,6 +15,20 @@ function extractStreamingInsight(text: string): string {
     .replace(/\\\\/g, '\\');
 }
 
+interface PatternResult {
+  pattern: string;
+  evidence: string;
+  rootCause: string;
+  solution: string;
+  experimentToTry: string;
+}
+
+interface WeeklySynthesis {
+  subject: string;
+  body: string;
+  week_start: string;
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -24,6 +38,9 @@ export default function Dashboard() {
   const [userPlan, setUserPlan] = useState('free');
   const [checkinsThisWeek, setCheckinsThisWeek] = useState(0);
   const [streamingText, setStreamingText] = useState('');
+  const [pattern, setPattern] = useState<PatternResult | null>(null);
+  const [weeklySynthesis, setWeeklySynthesis] = useState<WeeklySynthesis | null>(null);
+  const [showWeekly, setShowWeekly] = useState(false);
 
   const [form, setForm] = useState({
     moodScore: 5,
@@ -34,8 +51,12 @@ export default function Dashboard() {
 
   const [response, setResponse] = useState({
     insight: '',
-    coachingTip: '',
-    pattern: ''
+    rootCause: '',
+    microIntervention: '',
+    patternDetected: '',
+    isCrisis: false,
+    crisisMessage: '',
+    isBreakthrough: false,
   });
 
   const FREE_LIMIT = 3;
@@ -53,7 +74,17 @@ export default function Dashboard() {
         console.error('Failed to load user data:', err);
       }
     }
+    async function loadWeeklySynthesis() {
+      try {
+        const res = await fetch('/api/mood/weekly-synthesis');
+        const data = await res.json();
+        setWeeklySynthesis(data.synthesis || null);
+      } catch (err) {
+        console.error('Failed to load weekly synthesis:', err);
+      }
+    }
     loadUserData();
+    loadWeeklySynthesis();
   }, []);
 
   async function handleUpgrade(priceId: string) {
@@ -121,7 +152,15 @@ export default function Dashboard() {
         .replace(/\s*```$/, '')
         .trim();
 
-      let parsed: { insight?: string; coachingTip?: string; patternDetected?: string } = {};
+      let parsed: {
+        insight?: string;
+        rootCause?: string;
+        microIntervention?: string;
+        patternDetected?: string;
+        isCrisis?: boolean;
+        crisisMessage?: string;
+        isBreakthrough?: boolean;
+      } = {};
       try {
         parsed = JSON.parse(cleaned);
       } catch {
@@ -131,12 +170,24 @@ export default function Dashboard() {
 
       setResponse({
         insight: parsed.insight || '',
-        coachingTip: parsed.coachingTip || '',
-        pattern: parsed.patternDetected || 'none',
+        rootCause: parsed.rootCause || '',
+        microIntervention: parsed.microIntervention || '',
+        patternDetected: parsed.patternDetected || 'none',
+        isCrisis: Boolean(parsed.isCrisis),
+        crisisMessage: parsed.crisisMessage || '',
+        isBreakthrough: Boolean(parsed.isBreakthrough),
       });
       setStreamingText('');
       setSubmitted(true);
       setCheckinsThisWeek(prev => prev + 1);
+
+      // Prompt 2: check for a cross-check-in pattern once there's history to look at.
+      if (!parsed.isCrisis) {
+        fetch('/api/mood/patterns')
+          .then((r) => r.json())
+          .then((data) => setPattern(data.pattern || null))
+          .catch((err) => console.error('Failed to load pattern insight:', err));
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to get coaching insight');
     } finally {
@@ -149,15 +200,92 @@ export default function Dashboard() {
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-2xl mx-auto">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-white mb-2">Daily Mental OS</h1>
-            <p className="text-slate-400">
-              Your personal AI wellness coach • {userPlan === 'free' ? `${FREE_LIMIT - checkinsThisWeek} check-ins left this week` : 'Unlimited'} 
-            </p>
+          <div className="mb-8 flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-4xl font-bold text-white mb-2">Daily Mental OS</h1>
+              <p className="text-slate-400">
+                Your personal AI wellness coach • {userPlan === 'free' ? `${FREE_LIMIT - checkinsThisWeek} check-ins left this week` : 'Unlimited'}
+              </p>
+            </div>
+            {weeklySynthesis && (
+              <button
+                onClick={() => setShowWeekly((v) => !v)}
+                className="flex items-center gap-2 text-sm text-slate-300 hover:text-white border border-slate-600 hover:border-slate-500 rounded-lg px-3 py-2 transition shrink-0"
+              >
+                <Mail size={16} />
+                Weekly Insight
+              </button>
+            )}
           </div>
 
-          {/* Success State */}
-          {submitted && (
+          {/* Weekly Synthesis (Prompt 3) */}
+          {showWeekly && weeklySynthesis && (
+            <div className="bg-slate-800/60 border border-slate-600 rounded-lg p-6 mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-white font-semibold">{weeklySynthesis.subject}</h3>
+                <button
+                  onClick={() => setShowWeekly(false)}
+                  className="text-slate-400 hover:text-white text-sm transition"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="text-slate-300 whitespace-pre-line leading-relaxed">{weeklySynthesis.body}</p>
+            </div>
+          )}
+
+          {/* Crisis State (Prompt 5) — takes priority over everything else */}
+          {submitted && response.isCrisis && (
+            <div className="bg-red-500/20 border border-red-500 rounded-lg p-6 mb-6">
+              <div className="flex items-start gap-4">
+                <ShieldAlert className="text-red-400 mt-1 shrink-0" size={24} />
+                <div className="flex-1">
+                  <h3 className="text-white font-semibold mb-2">We&apos;re concerned about you</h3>
+                  <p className="text-slate-200 whitespace-pre-line leading-relaxed">{response.crisisMessage}</p>
+                  <button
+                    onClick={() => {
+                      setSubmitted(false);
+                      setForm({ moodScore: 5, energyLevel: 5, stressLevel: 5, journalEntry: '' });
+                    }}
+                    className="text-slate-400 hover:text-white text-sm transition mt-4"
+                  >
+                    ✕ Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Breakthrough Celebration (Prompt 6) */}
+          {submitted && !response.isCrisis && response.isBreakthrough && (
+            <div className="bg-gradient-to-r from-amber-500/20 to-emerald-500/20 border border-amber-400 rounded-lg p-6 mb-6">
+              <div className="flex items-start gap-4">
+                <Sparkles className="text-amber-300 mt-1 shrink-0" size={24} />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-white font-semibold">Breakthrough moment 🎉</h3>
+                    <button
+                      onClick={() => {
+                        setSubmitted(false);
+                        setPattern(null);
+                        setForm({ moodScore: 5, energyLevel: 5, stressLevel: 5, journalEntry: '' });
+                      }}
+                      className="text-slate-400 hover:text-white text-sm transition"
+                    >
+                      ✕ New check-in
+                    </button>
+                  </div>
+                  <p className="text-slate-200 mb-4 leading-relaxed">{response.insight}</p>
+                  {response.microIntervention && (
+                    <p className="text-amber-200 font-medium leading-relaxed">Keep the momentum: {response.microIntervention}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Standard Coaching Insight (Prompts 1 & 4) */}
+          {submitted && !response.isCrisis && !response.isBreakthrough && (
             <div className="bg-emerald-500/20 border border-emerald-500 rounded-lg p-6 mb-6">
               <div className="flex items-start gap-4">
                 <CheckCircle2 className="text-emerald-400 mt-1 shrink-0" size={24} />
@@ -167,7 +295,7 @@ export default function Dashboard() {
                     <button
                       onClick={() => {
                         setSubmitted(false);
-                        setResponse({ insight: '', coachingTip: '', pattern: '' });
+                        setPattern(null);
                         setForm({ moodScore: 5, energyLevel: 5, stressLevel: 5, journalEntry: '' });
                       }}
                       className="text-slate-400 hover:text-white text-sm transition"
@@ -176,12 +304,31 @@ export default function Dashboard() {
                     </button>
                   </div>
                   <p className="text-slate-300 mb-4 leading-relaxed">{response.insight}</p>
-                  {response.coachingTip && (
-                    <p className="text-emerald-300 font-medium leading-relaxed">💡 {response.coachingTip}</p>
+                  {response.rootCause && (
+                    <p className="text-slate-400 text-sm mb-2">What&apos;s really going on: <span className="text-slate-300">{response.rootCause}</span></p>
                   )}
-                  {response.pattern && response.pattern !== 'none' && (
-                    <p className="text-slate-400 text-sm mt-3">Pattern detected: <span className="text-slate-300">{response.pattern.replace(/_/g, ' ')}</span></p>
+                  {response.microIntervention && (
+                    <p className="text-emerald-300 font-medium leading-relaxed">💡 {response.microIntervention}</p>
                   )}
+                  {response.patternDetected && response.patternDetected !== 'none' && (
+                    <p className="text-slate-400 text-sm mt-3">Pattern detected: <span className="text-slate-300">{response.patternDetected.replace(/_/g, ' ')}</span></p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Cross-check-in Pattern (Prompt 2) */}
+          {submitted && !response.isCrisis && pattern && (
+            <div className="bg-blue-500/10 border border-blue-500/40 rounded-lg p-6 mb-6">
+              <div className="flex items-start gap-4">
+                <TrendingUp className="text-blue-400 mt-1 shrink-0" size={24} />
+                <div className="flex-1">
+                  <h3 className="text-white font-semibold mb-2">{pattern.pattern}</h3>
+                  <p className="text-slate-400 text-sm mb-2">{pattern.evidence}</p>
+                  <p className="text-slate-300 mb-3 leading-relaxed">{pattern.rootCause}</p>
+                  <p className="text-blue-300 font-medium leading-relaxed mb-2">Try this: {pattern.solution}</p>
+                  <p className="text-slate-400 text-sm">Experiment: {pattern.experimentToTry}</p>
                 </div>
               </div>
             </div>
